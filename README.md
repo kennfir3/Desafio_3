@@ -183,7 +183,21 @@ Ejecuta toda la suite desde la raíz:
 dotnet test
 ```
 
-Las pruebas utilizan una base EF InMemory independiente por caso y cubren consultas, creación, validación de duplicados, órdenes y eliminación restringida. Resultado verificado: **8 pruebas aprobadas**.
+Todas las pruebas siguen Arrange–Act–Assert. Cada escenario que usa persistencia crea una base EF Core InMemory aislada; las pruebas de Identity usan Moq sobre `UserManager` y un origen de configuración en memoria para la generación de JWT.
+
+|Archivo|Cobertura|
+|---|---|
+|`ServiceTests.cs`|Servicios de clientes y órdenes: consultas, creación, duplicados, filtrado y eliminación restringida|
+|`ClientesControllerTests.cs`|GET existente/no existente y POST válido/duplicado, verificando resultados HTTP `200`, `404`, `201` y `409`|
+|`OrdenesControllerTests.cs`|POST válido, POST con cliente inexistente y GET filtrado por cliente|
+|`AuthTests.cs`|Registro con asignación del rol `User`, email duplicado, credenciales inválidas y JWT con claim de rol|
+|`AuthorizationTests.cs`|Atributos `[Authorize]` de clientes, órdenes, reportes y DELETE restringido a `Admin`|
+
+Resultado verificado: **20 pruebas aprobadas**. Para listar los casos sin ejecutarlos:
+
+```powershell
+dotnet test --list-tests
+```
 
 ## Decisiones de implementación
 
