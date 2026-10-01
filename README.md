@@ -45,7 +45,9 @@ Claves `clientes:all`, `clientes:{id}` y `ordenes:all`, con TTL de 10 minutos. P
 
 ## SSRS
 
-Ejecute `sqlcmd -S localhost -E -i database/04_ssrs_permissions.sql`. Configure en Portal `/DataSources/CompanyManagementDS`: `Data Source=localhost;Initial Catalog=CompanyManagement`, credenciales Windows/cuenta de servicio. Ejecute `powershell -ExecutionPolicy Bypass -File reports/deploy-reports.ps1`; si REST no acepta el payload de su SSRS, Portal > Cargar cada RDL a `/Desafio3` y enlace el origen. URLs: `http://kenn/ReportServer?/Desafio3/ClientesActivos&rs:Command=Render` y equivalentes para los otros dos.
+Ejecute `sqlcmd -S localhost -E -i database/04_ssrs_permissions.sql` y `powershell -ExecutionPolicy Bypass -File reports/deploy-reports.ps1`. El script crea `/DataSources`, `CompanyManagementDS` y publica/actualiza los informes. Los RDL fueron corregidos para RDL 2016: todo Textbox usa `Paragraphs > Paragraph > TextRuns > TextRun > Value`.
+
+La publicación REST y XML de los tres RDL se verificaron. Si SSRS muestra `rsInvalidDataSourceReference`, abra Portal > informe > **Administrar > Orígenes de datos**, vuelva a seleccionar `/DataSources/CompanyManagementDS`, guarde y renderice la URL final.
 
 ## Decisiones y supuestos
 
@@ -60,7 +62,7 @@ Ejecute `sqlcmd -S localhost -E -i database/04_ssrs_permissions.sql`. Configure 
 ## PASOS MANUALES PARA TERMINAR EL PROYECTO AL 100%
 
 1. [ ] Verificar SQL `sqlcmd -S localhost -E -Q "select 1"`, Redis `docker exec redis redis-cli ping`, SSRS http://kenn/Reports y arrancar API con el comando anterior.
-2. [ ] Ejecutar permisos SSRS y `reports/deploy-reports.ps1`; si falla, cargar manualmente los tres RDL en `/Desafio3`, enlazar `CompanyManagementDS`, abrir sus tres URLs.
+2. [ ] Ejecutar permisos SSRS y `reports/deploy-reports.ps1`; confirme en Portal que los informes usan `/DataSources/CompanyManagementDS`. Si aparece `rsInvalidDataSourceReference`, vuelva a enlazarlo en Administrar > Orígenes de datos y guarde.
 3. [ ] Guardar capturas: `01-postman-auth-crud-reportes.png` (incluye 403 User/200 Admin), `02-dotnet-test.png`, `03-ssrs-clientes-activos.png`, `04-ssrs-ingresos.png`, `05-ssrs-inactivos.png`, `06-redis.png` en `docs/evidencias/`.
 4. [ ] En Postman importe colección y entorno; ejecute Register, Login, Clientes, Reportes en ese orden y copie token.
 5. [ ] Video 5–8 min: estructura, JWT/roles, CRUD, dos GET para hit/miss, `redis-cli keys '*'`/`ttl`, invalidación, SSRS, pruebas y README.
