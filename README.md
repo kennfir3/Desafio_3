@@ -2,7 +2,7 @@
 
 API REST para gestionar clientes y órdenes con autenticación, autorización por roles, caché Redis y reportes paginados en SQL Server Reporting Services (SSRS).
 
-> Proyecto académico terminado para el Desafío 3, opción 2. La solución y las instrucciones de ejecución están en este repositorio.
+> Proyecto académico del Desafío 3, opción 2.
 
 ## Funcionalidades
 
@@ -58,6 +58,12 @@ sqlcmd -S localhost -E -Q "SELECT 1"
 docker exec redis redis-cli ping
 ```
 
+Si Redis no existe o no está iniciado, créalo con Docker:
+
+```powershell
+docker run -d --name redis -p 6379:6379 redis
+```
+
 ## Configuración y ejecución
 
 Clona el repositorio y entra en su carpeta:
@@ -76,7 +82,7 @@ dotnet ef database update --project src/CompanyManagement.Api --startup-project 
 sqlcmd -S localhost -E -i database/03_seed.sql -f 65001
 ```
 
-El seed contiene 15 clientes y 40 órdenes, con clientes sin órdenes para distinguir los reportes. El código también genera datos equivalentes al iniciar en entorno `Development` si la tabla de clientes está vacía.
+El seed contiene 15 clientes y 40 órdenes, con clientes sin órdenes para distinguir los reportes. El código también genera datos equivalentes al iniciar en entorno `Development` si la tabla de clientes está vacía. **No omitas `-f 65001`: sin ese parámetro `sqlcmd` puede corromper los caracteres acentuados.**
 
 Inicia la API y abre Swagger:
 
@@ -167,13 +173,21 @@ powershell -ExecutionPolicy Bypass -File reports/deploy-reports.ps1
 
 El primer script otorga permisos de lectura a la cuenta de servicio de SSRS. El segundo crea o actualiza la carpeta y el origen de datos, y publica los tres informes mediante la API REST.
 
-Informes publicados:
+Portal SSRS (para navegar):
 
-- [Clientes activos](http://kenn/Reports?/Desafio3/ClientesActivos)
-- [Ingresos por cliente](http://kenn/Reports?/Desafio3/IngresosClientes)
-- [Clientes inactivos](http://kenn/Reports?/Desafio3/ClientesInactivos)
+- [Clientes activos](http://kenn/Reports/report/Desafio3/ClientesActivos)
+- [Ingresos por cliente](http://kenn/Reports/report/Desafio3/IngresosClientes)
+- [Clientes inactivos](http://kenn/Reports/report/Desafio3/ClientesInactivos)
 
-La API de la aplicación devuelve las URL de renderizado para usuarios Admin. Los PDF de muestra están en `docs/evidencias/`.
+Renderizado directo (las URLs que devuelve la API a Admin):
+
+- `http://kenn/ReportServer?/Desafio3/ClientesActivos&rs:Command=Render`
+- `http://kenn/ReportServer?/Desafio3/IngresosClientes&rs:Command=Render`
+- `http://kenn/ReportServer?/Desafio3/ClientesInactivos&rs:Command=Render`
+
+Para descargar o abrir una versión PDF, añade `&rs:Format=PDF` al final de cualquiera de esas URL. Las tres rutas de la API se comprobaron y devolvieron exactamente estas URLs; los informes abrieron en SSRS.
+
+El host `kenn` es el nombre del equipo de desarrollo. En otro equipo, cambia `SSRS:BaseUrl` en `appsettings.json` y los hosts en `reports/deploy-reports.ps1`.
 
 ## Pruebas
 
@@ -208,7 +222,48 @@ dotnet test --list-tests
 
 ## Evidencias
 
-`docs/evidencias/` contiene PDFs renderizados desde SSRS. Las capturas para la entrega académica se pueden guardar en esa misma carpeta.
+Guarda las capturas de la demostración en `docs/evidencias/` con estos nombres:
+
+|Archivo|Contenido sugerido|
+|---|---|
+|`01_postman_register_login.png`|Registro e inicio de sesión; token obtenido|
+|`02_postman_clientes_crud.png`|Operaciones CRUD de clientes con token|
+|`03_postman_403_user.png`|Usuario `User` recibe `403` al consultar un reporte|
+|`04_postman_200_admin.png`|Usuario `Admin` obtiene `200` del endpoint de reporte|
+|`05_dotnet_test.png`|Salida de pruebas aprobadas|
+|`06_reporte_clientes_activos.png`|Informe de clientes activos en SSRS|
+|`07_reporte_ingresos_clientes.png`|Informe de ingresos por cliente en SSRS|
+|`08_reporte_clientes_inactivos.png`|Informe de clientes inactivos en SSRS|
+|`09_redis_keys_ttl.png`|Claves Redis y expiración con `redis-cli`|
+
+Los PDF de ejemplo renderizados están guardados en esta carpeta.
+
+## Video demo
+
+Enlace al video: `<PEGAR_AQUI_EL_ENLACE>`
+
+Guion sugerido para una demostración de 5 a 8 minutos:
+
+1. **0:00–0:45:** presentar la estructura del repositorio y tecnologías principales.
+2. **0:45–1:45:** registrar/iniciar sesión, mostrar JWT y explicar los roles `User` y `Admin`.
+3. **1:45–2:45:** demostrar CRUD de clientes y creación/consulta de órdenes.
+4. **2:45–3:45:** repetir un GET para observar cache hit; mostrar claves y TTL en Redis y luego invalidación tras una escritura.
+5. **3:45–4:45:** mostrar el `403` de `User`, el `200` de `Admin` y abrir los tres informes SSRS.
+6. **4:45–5:45:** ejecutar `dotnet test` y comentar la cobertura por archivo.
+7. **5:45–6:15:** cerrar con configuración, decisiones de persistencia y README.
+
+## Preguntas probables en la defensa
+
+1. **¿Cómo se autentica una petición?** Se envía un JWT firmado en `Authorization: Bearer`; JwtBearer valida emisor, audiencia, firma y vigencia.
+2. **¿Cuál es el esquema de autenticación por defecto?** `Program.cs` establece `JwtBearerDefaults.AuthenticationScheme` como esquema de autenticación, desafío y prohibición.
+3. **¿Qué rol recibe un usuario nuevo?** `AuthService.Register` crea el usuario y llama a `AddToRoleAsync` con `User`.
+4. **¿Para qué se usa Repository?** `IClienteRepository` e `IOrdenRepository` aíslan las consultas de EF Core de los servicios.
+5. **¿Cómo se invalida la caché?** Los servicios eliminan las claves afectadas al crear/actualizar/eliminar clientes y al crear órdenes.
+6. **¿Qué ocurre si Redis cae?** `RedisCacheService` registra una advertencia y sus operaciones de caché fallan de forma controlada; la consulta continúa hacia SQL Server.
+7. **¿Por qué `DeleteBehavior.Restrict`?** Evita borrar órdenes históricas indirectamente; el servicio rechaza eliminar clientes que todavía tienen órdenes.
+8. **¿Quién puede ver los reportes?** `ReportesController` está decorado con `[Authorize(Roles = "Admin")]`; un usuario autenticado sin ese rol recibe `403`.
+9. **¿Cómo se aíslan las pruebas de base de datos?** Cada prueba de persistencia crea un nombre único para EF Core InMemory.
+10. **¿Qué configuración de datos usan los RDL?** Cada informe referencia el origen compartido `/DataSources/CompanyManagementDS`, que apunta a `CompanyManagement`.
 
 ## Licencia
 
