@@ -1,4 +1,4 @@
-USE CompanyManagement;
+﻿USE CompanyManagement;
 GO
 SET XACT_ABORT ON;
 BEGIN TRAN;
