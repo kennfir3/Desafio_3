@@ -1,0 +1,3 @@
+using Microsoft.AspNetCore.Authorization; using Microsoft.AspNetCore.Mvc;
+namespace CompanyManagement.Api.Controllers;
+[ApiController,Route("api/reportes"),Authorize(Roles="Admin")] public class ReportesController(IConfiguration config):ControllerBase { ActionResult Link(string name){var baseUrl=(config["SSRS:BaseUrl"]??"http://kenn/ReportServer").TrimEnd('/');var folder=config["SSRS:ReportFolder"]??"/Desafio3";return Ok(new{nombre=name,url=$"{baseUrl}?{folder}/{name}&rs:Command=Render"});} [HttpGet("clientes-activos")]public ActionResult Active()=>Link("ClientesActivos");[HttpGet("ingresos-clientes")]public ActionResult Revenue()=>Link("IngresosClientes");[HttpGet("clientes-inactivos")]public ActionResult Inactive()=>Link("ClientesInactivos"); }

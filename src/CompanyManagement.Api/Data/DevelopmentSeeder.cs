@@ -1,0 +1,3 @@
+using CompanyManagement.Api.Models;
+namespace CompanyManagement.Api.Data;
+public static class DevelopmentSeeder { public static async Task Seed(AppDbContext db){if(db.Clientes.Any())return;var clients=Enumerable.Range(1,15).Select(i=>new Cliente{Nombre=$"Cliente Demo {i}",Email=$"cliente{i}@empresa.test",FechaRegistro=DateTime.UtcNow.AddDays(i<=6?-i:-40-i)}).ToList();db.Clientes.AddRange(clients);await db.SaveChangesAsync();db.Ordenes.AddRange(Enumerable.Range(1,40).Select(i=>new Orden{ClienteId=((i-1)%10)+1,FechaOrden=DateTime.UtcNow.AddDays(-i),MontoTotal=100+i*17.35m}));await db.SaveChangesAsync();} }

@@ -1,0 +1,3 @@
+using CompanyManagement.Api.DTOs; using CompanyManagement.Api.Services; using Microsoft.AspNetCore.Mvc;
+namespace CompanyManagement.Api.Controllers;
+[ApiController,Route("api/auth")] public class AuthController(IAuthService service):ControllerBase { [HttpPost("register")] public async Task<ActionResult> Register(RegisterDto d){var r=await service.Register(d);return r.ok?StatusCode(201,new{message="Usuario registrado con rol User."}):Conflict(new ProblemDetails{Title=r.error,Status=409});} [HttpPost("login")] public async Task<ActionResult> Login(LoginDto d){var r=await service.Login(d);return r.token is { } t?Ok(new{token=t,expiresAt=r.expires}):Unauthorized(new ProblemDetails{Title=r.error,Status=401});} }
