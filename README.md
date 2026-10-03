@@ -1,72 +1,108 @@
 # Company Management API
 
-API REST para gestionar clientes y órdenes con autenticación, autorización por roles, caché Redis y reportes paginados en SQL Server Reporting Services (SSRS).
+[![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
+[![C#](https://img.shields.io/badge/C%23-12.0-239120?logo=c-sharp&logoColor=white)](https://learn.microsoft.com/dotnet/csharp/)
+[![Entity Framework Core](https://img.shields.io/badge/EF%20Core-8.0-512BD4?logo=dotnet&logoColor=white)](https://learn.microsoft.com/ef/core/)
+[![SQL Server](https://img.shields.io/badge/SQL%20Server-2022%2B-CC292B?logo=microsoftsqlserver&logoColor=white)](https://www.microsoft.com/sql-server/)
+[![Redis](https://img.shields.io/badge/Redis-Cache-DC382D?logo=redis&logoColor=white)](https://redis.io/)
+[![SSRS](https://img.shields.io/badge/SSRS-Reporting%20Services-0078D4?logo=microsoft&logoColor=white)](https://learn.microsoft.com/sql/reporting-services/)
+[![xUnit](https://img.shields.io/badge/Tests-xUnit%20%7C%2020%20Passed-success?logo=xunit&logoColor=white)](https://xunit.net/)
 
-> Proyecto académico del Desafío 3, opción 2.
+API REST empresarial diseñada para la gestión integral de clientes y órdenes de compra. Implementa autenticación robusta basada en tokens JWT con control de acceso basado en roles (RBAC), persistencia relacional con Entity Framework Core, optimización distribuida de alto rendimiento mediante Redis, y visualización de reportes analíticos paginados en SQL Server Reporting Services (SSRS).
 
-## Funcionalidades
+---
 
-- Registro e inicio de sesión con ASP.NET Core Identity y tokens JWT.
-- Roles `User` y `Admin`; acceso restringido a los reportes para administradores.
-- CRUD de clientes y gestión de órdenes, con validaciones y respuestas HTTP apropiadas.
-- Persistencia en SQL Server mediante Entity Framework Core y migraciones.
-- Caché Redis de 10 minutos para consultas principales, con invalidación al modificar datos.
-- Tres reportes SSRS: clientes activos, ingresos por cliente y clientes inactivos recientes.
-- Pruebas unitarias con xUnit y EF Core InMemory.
+## Índice
 
-## Tecnologías
+- [Características Principales](#características-principales)
+- [Arquitectura de la Solución](#arquitectura-de-la-solución)
+- [Stack Tecnológico](#stack-tecnológico)
+- [Requisitos Previos](#requisitos-previos)
+- [Puesta en Marcha](#puesta-en-marcha)
+- [Especificación de la API](#especificación-de-la-api)
+- [Estrategia de Caché Distribuida](#estrategia-de-caché-distribuida)
+- [Informes Empresariales (SSRS)](#informes-empresariales-ssrs)
+- [Aseguramiento de la Calidad (Testing)](#aseguramiento-de-la-calidad-testing)
+- [Estructura del Proyecto](#estructura-del-proyecto)
 
-|Área|Tecnología|
-|---|---|
-|API|ASP.NET Core 8 Web API|
-|Datos|Entity Framework Core 8, SQL Server|
-|Identidad|ASP.NET Core Identity, JWT Bearer|
-|Caché|Redis, StackExchange.Redis|
-|Informes|SSRS 2022, RDL 2016|
-|Pruebas|xUnit, EF Core InMemory, Moq|
-|Documentación de API|Swagger / OpenAPI|
+---
 
-## Arquitectura del repositorio
+## Características Principales
+
+* **Seguridad y Control de Acceso (RBAC):** Integración con ASP.NET Core Identity. Registro público con asignación automática de rol `User` y protección de endpoints mediante JWT Bearer tokens. Operaciones privilegiadas (reportes analíticos y baja de clientes) restringidas exclusivamente al rol `Admin`.
+* **Capa de Dominio y Persistencia:** Mapeo objeto-relacional (ORM) mediante Entity Framework Core 8 con SQL Server, respaldado por migraciones automáticas y scripts de seed inicial. Integridad referencial protegida bajo políticas estrictas de restricción de borrado (`DeleteBehavior.Restrict`).
+* **Optimización de Consultas (Redis):** Caché distribuida para consultas frecuentes con TTL de 10 minutos. Mecanismo de invalidación reactiva e inmediata ante eventos de mutación (creación, actualización o borrado) y tolerancia a fallos con degradación controlada a SQL Server.
+* **Inteligencia de Negocio y Reportería (SSRS):** Informes paginados RDL 2016 integrados a un origen de datos compartido (`CompanyManagementDS`) y expuestos mediante URLs seguras en la API.
+* **Calidad y Mantenibilidad:** Arquitectura desacoplada basada en el patrón Repository, inversión de dependencias y suite de 20 pruebas unitarias automatizadas con xUnit y EF Core InMemory.
+
+---
+
+## Arquitectura de la Solución
+
+El sistema implementa una arquitectura en capas con separación rigurosa de responsabilidades:
 
 ```text
-DesafioEmpresarial.sln
-├── src/CompanyManagement.Api/   API, controladores, DTO, entidades, datos y servicios
-├── tests/CompanyManagement.Tests/ Pruebas unitarias
-├── database/                    Scripts de base de datos, esquema, seed y permisos SSRS
-├── reports/                     Informes RDL y script de publicación
-├── postman/                     Colección y entorno de Postman
-└── docs/
-    ├── enunciado/               PDF original del desafío
-    └── evidencias/              PDF de ejemplo y capturas del proyecto
+┌───────────────────────────────────────────────────────────────┐
+│               CompanyManagement.Api (REST / HTTP)             │
+│        Controllers  │  Filters  │  Swagger  │  JWT Bearer     │
+└───────────────┬───────────────────────────────┬───────────────┘
+                │                               │
+                ▼                               ▼
+┌──────────────────────────────┐ ┌──────────────────────────────┐
+│       Services Layer         │ │     RedisCacheService        │
+│ Business Logic & Validation  │ │ (Distributed Read Cache)     │
+└───────────────┬──────────────┘ └──────────────┬───────────────┘
+                │                               │
+                ▼                               ▼
+┌──────────────────────────────┐ ┌──────────────────────────────┐
+│      Repositories Layer      │ │      StackExchange.Redis     │
+│   (ICliente / IOrden Repo)   │ │      (Docker: Port 6379)     │
+└───────────────┬──────────────┘ └──────────────────────────────┘
+                │
+                ▼
+┌──────────────────────────────┐ ┌──────────────────────────────┐
+│    Entity Framework Core     │ │     SSRS Reporting 2022      │
+│  (AppDbContext / Identity)   │ │   (RDL Shared Data Source)   │
+└───────────────┬──────────────┘ └──────────────┬───────────────┘
+                │                               │
+                ▼                               ▼
+┌───────────────────────────────────────────────────────────────┐
+│              Microsoft SQL Server (CompanyManagement)         │
+└───────────────────────────────────────────────────────────────┘
 ```
 
-La API separa controladores, servicios de aplicación, repositorios, DTO y acceso a datos. `AppDbContext` integra las entidades del negocio con las tablas de Identity.
+---
 
-## Requisitos
+## Stack Tecnológico
 
-- Windows y .NET SDK `8.0.408` (configurado en `global.json`).
-- SQL Server local con autenticación de Windows.
-- Redis accesible en `localhost:6379`.
-- SSRS 2022 disponible en `http://kenn/Reports` para publicar y consultar informes.
-- `sqlcmd`, Docker y Git.
+| Componente | Tecnología | Versión | Rol en el Sistema |
+| :--- | :--- | :--- | :--- |
+| **Backend Framework** | ASP.NET Core Web API | 8.0 | Núcleo de servicios RESTful y middleware |
+| **ORM & Migraciones** | Entity Framework Core | 8.0 | Persistencia de datos y mapeo relacional |
+| **Base de Datos** | Microsoft SQL Server | 2022+ | Almacenamiento relacional de datos e identidad |
+| **Seguridad** | ASP.NET Core Identity | 8.0 | Gestión de usuarios, hashes y asignación de roles |
+| **Tokens** | Microsoft.IdentityModel (JWT) | 7.x | Autenticación simétrica stateless con claims |
+| **Caché Distribuida** | Redis & StackExchange.Redis | 7.x (Docker) | Aceleración de lectura e invalidación reactiva |
+| **Reportería** | SQL Server Reporting Services | 2022 (RDL 2016) | Informes paginados financieros y de clientes |
+| **Pruebas Unitarias** | xUnit, Moq, EF Core InMemory | 8.0 / 2.5 | Cobertura de lógica de negocio y controladores |
+| **Documentación** | Swagger / OpenAPI | 6.5 | Catálogo interactivo de la API REST |
 
-Comprobaciones rápidas:
+---
 
-```powershell
-dotnet --list-sdks
-sqlcmd -S localhost -E -Q "SELECT 1"
-docker exec redis redis-cli ping
-```
+## Requisitos Previos
 
-Si Redis no existe o no está iniciado, créalo con Docker:
+* **Sistema Operativo:** Windows 10/11 o Windows Server.
+* **.NET SDK:** Versión `8.0.x` instalada ([global.json](file:///c:/Users/Kenn/Documents/TAREAS%20OFICIALES-%20universidad/DESARROLLO%20DE%20SOFTWARE%20EMPRESARIAL/Desafio%203/global.json)).
+* **Motor de Base de Datos:** SQL Server local con autenticación de Windows habilitada.
+* **Docker Desktop:** En ejecución para el servicio de Redis.
+* **Servidor de Reportes:** SQL Server Reporting Services (SSRS 2022).
+* **Herramientas de Consola:** Git, `sqlcmd`, .NET CLI.
 
-```powershell
-docker run -d --name redis -p 6379:6379 redis
-```
+---
 
-## Configuración y ejecución
+## Puesta en Marcha
 
-Clona el repositorio y entra en su carpeta:
+### 1. Clonación del Repositorio y Restauración de Paquetes
 
 ```powershell
 git clone https://github.com/kennfir3/Desafio_3.git
@@ -74,197 +110,189 @@ cd Desafio_3
 dotnet restore
 ```
 
-Crea la base, aplica la migración y carga datos de demostración:
+### 2. Infraestructura de Caché (Redis en Docker)
+
+Inicie el contenedor de Redis en el puerto estándar `6379`:
 
 ```powershell
+docker run -d --name redis -p 6379:6379 redis
+```
+
+*Verificación de conectividad:*
+```powershell
+docker exec redis redis-cli ping
+# Salida esperada: PONG
+```
+
+### 3. Aprovisionamiento de Base de Datos
+
+Ejecute la creación de la base de datos, aplique las migraciones de EF Core y cargue los datos de prueba iniciales (seed):
+
+```powershell
+# Creación de la base de datos CompanyManagement
 sqlcmd -S localhost -E -i database/01_create_database.sql
+
+# Aplicación de migraciones de Entity Framework Core
 dotnet ef database update --project src/CompanyManagement.Api --startup-project src/CompanyManagement.Api
+
+# Carga de datos de demostración (clientes y órdenes)
 sqlcmd -S localhost -E -i database/03_seed.sql -f 65001
 ```
 
-El seed contiene 15 clientes y 40 órdenes, con clientes sin órdenes para distinguir los reportes. El código también genera datos equivalentes al iniciar en entorno `Development` si la tabla de clientes está vacía. **No omitas `-f 65001`: sin ese parámetro `sqlcmd` puede corromper los caracteres acentuados.**
+> **Nota:** El parámetro `-f 65001` asegura la codificación correcta en UTF-8 para nombres y caracteres acentuados.
 
-Inicia la API y abre Swagger:
+### 4. Despliegue de Reportes en SSRS
 
-```powershell
-dotnet run --project src/CompanyManagement.Api --urls http://localhost:5000
-```
-
-Swagger queda disponible en `http://localhost:5000/swagger`. La cadena de SQL Server, Redis y SSRS se configuran en `src/CompanyManagement.Api/appsettings.json`.
-
-### Configuración de seguridad
-
-El valor de JWT del archivo de configuración está marcado como exclusivo de desarrollo. Antes de utilizar otro entorno, configura un secreto propio, por ejemplo:
-
-```powershell
-dotnet user-secrets init --project src/CompanyManagement.Api
-dotnet user-secrets set "Jwt:Key" "REEMPLAZAR_POR_UN_SECRETO_LARGO_Y_ALEATORIO" --project src/CompanyManagement.Api
-```
-
-También puedes usar la variable de entorno `Jwt__Key`. El usuario `admin@company.com` con contraseña `Admin123!` es una cuenta de demostración local; cambia esos valores antes de desplegar fuera del entorno de desarrollo.
-
-## API
-
-Los endpoints de clientes y órdenes requieren `Authorization: Bearer <token>`. Los reportes requieren además el rol `Admin`. El registro es público y asigna el rol `User` automáticamente.
-
-|Método|Ruta|Acceso|Descripción|
-|---|---|---|---|
-|`POST`|`/api/auth/register`|Público|Registra un usuario con rol `User`|
-|`POST`|`/api/auth/login`|Público|Autentica y devuelve token y expiración|
-|`GET`|`/api/clientes`|Autenticado|Lista clientes|
-|`GET`|`/api/clientes/{id}`|Autenticado|Obtiene un cliente|
-|`POST`|`/api/clientes`|Autenticado|Crea un cliente|
-|`PUT`|`/api/clientes/{id}`|Autenticado|Actualiza un cliente|
-|`DELETE`|`/api/clientes/{id}`|Admin|Elimina un cliente que no tenga órdenes|
-|`GET`|`/api/ordenes`|Autenticado|Lista órdenes|
-|`GET`|`/api/ordenes/{id}`|Autenticado|Obtiene una orden|
-|`POST`|`/api/ordenes`|Autenticado|Crea una orden para un cliente existente|
-|`GET`|`/api/ordenes/cliente/{clienteId}`|Autenticado|Lista las órdenes de un cliente|
-|`GET`|`/api/reportes/clientes-activos`|Admin|Devuelve la URL del informe de clientes activos|
-|`GET`|`/api/reportes/ingresos-clientes`|Admin|Devuelve la URL del informe de ingresos|
-|`GET`|`/api/reportes/clientes-inactivos`|Admin|Devuelve la URL del informe de clientes inactivos|
-
-### Ejemplo de autenticación
-
-```powershell
-$body = @{ email = 'admin@company.com'; password = 'Admin123!' } | ConvertTo-Json
-$login = Invoke-RestMethod 'http://localhost:5000/api/auth/login' -Method Post -ContentType 'application/json' -Body $body
-$headers = @{ Authorization = "Bearer $($login.token)" }
-Invoke-RestMethod 'http://localhost:5000/api/clientes' -Headers $headers
-```
-
-Para probar con Postman, importa `postman/Desafio3.postman_collection.json` y `postman/Desafio3.local.postman_environment.json`. Registra o inicia sesión, guarda el token en la variable `token` y ejecuta las solicitudes protegidas.
-
-## Caché Redis
-
-La API usa estas claves con expiración de 10 minutos:
-
-|Clave|Contenido|
-|---|---|
-|`clientes:all`|Listado de clientes|
-|`clientes:{id}`|Cliente por identificador|
-|`ordenes:all`|Listado de órdenes|
-
-Crear, actualizar o eliminar clientes invalida el listado y, cuando aplica, la clave individual. Crear órdenes invalida el listado de órdenes y la caché del cliente relacionado. Los registros de aplicación identifican aciertos y fallos de caché. Si Redis no responde, la API registra el problema y continúa consultando SQL Server.
-
-Para inspeccionar las claves:
-
-```powershell
-docker exec redis redis-cli keys "*"
-docker exec redis redis-cli ttl clientes:all
-```
-
-## Informes SSRS
-
-Los tres informes utilizan el origen compartido `/DataSources/CompanyManagementDS` y definiciones RDL 2016:
-
-|Informe|Contenido|
-|---|---|
-|`ClientesActivos`|Clientes con al menos una orden y su total de órdenes|
-|`IngresosClientes`|Suma de órdenes por cliente|
-|`ClientesInactivos`|Clientes registrados durante el último mes que aún no tienen órdenes|
-
-La publicación configurada para este entorno es:
+Otorgue permisos a la cuenta de servicio de SSRS y publique los tres reportes RDL mediante la API de Reporting Services:
 
 ```powershell
 sqlcmd -S localhost -E -i database/04_ssrs_permissions.sql
 powershell -ExecutionPolicy Bypass -File reports/deploy-reports.ps1
 ```
 
-El primer script otorga permisos de lectura a la cuenta de servicio de SSRS. El segundo crea o actualiza la carpeta y el origen de datos, y publica los tres informes mediante la API REST.
+### 5. Ejecución del Servicio Web
 
-Portal SSRS (para navegar):
-
-- [Clientes activos](http://kenn/Reports/report/Desafio3/ClientesActivos)
-- [Ingresos por cliente](http://kenn/Reports/report/Desafio3/IngresosClientes)
-- [Clientes inactivos](http://kenn/Reports/report/Desafio3/ClientesInactivos)
-
-Renderizado directo (las URLs que devuelve la API a Admin):
-
-- `http://kenn/ReportServer?/Desafio3/ClientesActivos&rs:Command=Render`
-- `http://kenn/ReportServer?/Desafio3/IngresosClientes&rs:Command=Render`
-- `http://kenn/ReportServer?/Desafio3/ClientesInactivos&rs:Command=Render`
-
-Para descargar o abrir una versión PDF, añade `&rs:Format=PDF` al final de cualquiera de esas URL. Las tres rutas de la API se comprobaron y devolvieron exactamente estas URLs; los informes abrieron en SSRS.
-
-El host `kenn` es el nombre del equipo de desarrollo. En otro equipo, cambia `SSRS:BaseUrl` en `appsettings.json` y los hosts en `reports/deploy-reports.ps1`.
-
-## Pruebas
-
-Ejecuta toda la suite desde la raíz:
+Inicie la API en el entorno de desarrollo:
 
 ```powershell
-dotnet test
+dotnet run --project src/CompanyManagement.Api --urls http://localhost:5000
 ```
 
-Todas las pruebas siguen Arrange–Act–Assert. Cada escenario que usa persistencia crea una base EF Core InMemory aislada; las pruebas de Identity usan Moq sobre `UserManager` y un origen de configuración en memoria para la generación de JWT.
+* La interfaz interactiva de Swagger UI queda disponible en: [http://localhost:5000/swagger](http://localhost:5000/swagger)
+* Portal de reportes SSRS disponible en: `http://localhost/Reports` (o `http://kenn/Reports`)
 
-|Archivo|Cobertura|
-|---|---|
-|`ServiceTests.cs`|Servicios de clientes y órdenes: consultas, creación, duplicados, filtrado y eliminación restringida|
-|`ClientesControllerTests.cs`|GET existente/no existente y POST válido/duplicado, verificando resultados HTTP `200`, `404`, `201` y `409`|
-|`OrdenesControllerTests.cs`|POST válido, POST con cliente inexistente y GET filtrado por cliente|
-|`AuthTests.cs`|Registro con asignación del rol `User`, email duplicado, credenciales inválidas y JWT con claim de rol|
-|`AuthorizationTests.cs`|Atributos `[Authorize]` de clientes, órdenes, reportes y DELETE restringido a `Admin`|
+---
 
-Resultado verificado: **20 pruebas aprobadas**. Para listar los casos sin ejecutarlos:
+## Especificación de la API
+
+Todos los endpoints bajo las rutas `/api/clientes`, `/api/ordenes` y `/api/reportes` exigen la cabecera HTTP:
+```http
+Authorization: Bearer <TOKEN_JWT>
+```
+
+### Catálogo de Endpoints
+
+| Método | Endpoint | Nivel de Acceso | Descripción |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/auth/register` | Público | Registra un usuario y le asigna el rol `User` por defecto |
+| `POST` | `/api/auth/login` | Público | Autentica credenciales y emite el token JWT con claims de rol |
+| `GET` | `/api/clientes` | Autenticado | Obtiene la lista completa de clientes (con soporte para caché) |
+| `GET` | `/api/clientes/{id}` | Autenticado | Retorna el detalle del cliente especificado |
+| `POST` | `/api/clientes` | Autenticado | Registra un cliente e invalida la caché de clientes |
+| `PUT` | `/api/clientes/{id}` | Autenticado | Actualiza un cliente existente e invalida su caché |
+| `DELETE` | `/api/clientes/{id}` | **Admin** | Elimina un cliente. Se rechaza con `409` si posee órdenes |
+| `GET` | `/api/ordenes` | Autenticado | Lista el historial general de órdenes de compra |
+| `GET` | `/api/ordenes/{id}` | Autenticado | Obtiene una orden específica por su identificador |
+| `GET` | `/api/ordenes/cliente/{clienteId}` | Autenticado | Retorna las órdenes pertenecientes al cliente indicado (1 a N) |
+| `POST` | `/api/ordenes` | Autenticado | Registra una orden para un cliente existente e invalida caché |
+| `GET` | `/api/reportes/clientes-activos` | **Admin** | Provee la URL de renderizado del reporte de clientes activos |
+| `GET` | `/api/reportes/ingresos-clientes` | **Admin** | Provee la URL de renderizado del reporte de ingresos por cliente |
+| `GET` | `/api/reportes/clientes-inactivos` | **Admin** | Provee la URL del reporte de clientes inactivos recientes |
+
+### Credenciales de Demostración (Seed Local)
+
+* **Administrador:** `admin@company.com` | `Admin123!`
+* **Usuario Estándar:** Puede crearse directamente mediante `POST /api/auth/register` (ej. `usuario.demo@company.com` / `User123!`).
+
+---
+
+## Estrategia de Caché Distribuida
+
+La solución utiliza `StackExchange.Redis` para minimizar la latencia y descargar lecturas repetitivas sobre SQL Server.
+
+### Llaves y Políticas de Expiración
+
+| Clave | Contenido | Política de Expiración | Política de Invalidación |
+| :--- | :--- | :--- | :--- |
+| `clientes:all` | Listado general de clientes | 10 minutos (Sliding/Absolute) | Se elimina en `POST`, `PUT` y `DELETE` de clientes |
+| `clientes:{id}` | Registro individual de cliente | 10 minutos | Se elimina al ejecutar `PUT` o `DELETE` sobre el ID |
+| `ordenes:all` | Listado general de órdenes | 10 minutos | Se elimina al registrar una nueva orden (`POST /api/ordenes`) |
+
+### Resiliencia y Monitoreo de Caché
+
+* **Degradación Elegante:** Si el contenedor de Redis pierde conectividad o no responde, `RedisCacheService` captura la excepción, registra una advertencia en los logs de la aplicación y redirige la solicitud de forma transparente a SQL Server sin interrumpir el servicio.
+* **Inspección de llaves en tiempo real:**
+  ```powershell
+  # Listar claves activas
+  docker exec redis redis-cli keys "*"
+
+  # Comprobar tiempo de vida (TTL) restante en segundos
+  docker exec redis redis-cli ttl clientes:all
+  ```
+
+---
+
+## Informes Empresariales (SSRS)
+
+Los reportes han sido diseñados bajo el estándar **RDL 2016** y consumen el origen de datos compartido `/DataSources/CompanyManagementDS`:
+
+| Reporte | Identificador | Criterio de Selección SQL | Indicadores Clave |
+| :--- | :--- | :--- | :--- |
+| **Clientes Activos** | `ClientesActivos` | Clientes con al menos una orden (`COUNT(o.Id) >= 1`) | `Nombre`, `Email`, `Total órdenes` |
+| **Ingresos por Cliente** | `IngresosClientes` | Sumatoria acumulada de compras (`SUM(o.MontoTotal)`) | `Nombre`, `Email`, `Monto total`, Consolidado global |
+| **Clientes Inactivos** | `ClientesInactivos` | Registrados en el último mes sin compras asociadas | `Nombre`, `Email`, `Fecha registro` |
+
+*Las URLs de acceso directo retornadas por la API permiten renderizado interactivo en el portal web de SSRS o descarga directa en formato PDF añadiendo el parámetro `&rs:Format=PDF`.*
+
+---
+
+## Aseguramiento de la Calidad (Testing)
+
+El proyecto cuenta con una batería de pruebas automatizadas implementada en el proyecto `CompanyManagement.Tests`.
+
+### Ejecución de Pruebas
 
 ```powershell
-dotnet test --list-tests
+dotnet test --verbosity normal
 ```
 
-## Decisiones de implementación
+### Cobertura de la Suite
 
-- La relación entre cliente y órdenes usa `DeleteBehavior.Restrict`. No se eliminan clientes con órdenes asociadas; la API responde `409 Conflict`.
-- La eliminación de clientes y el acceso a reportes requieren `Admin`. El resto de operaciones protegidas admite cualquier usuario autenticado.
-- Las fechas se guardan en UTC.
-- Las credenciales de demostración y la clave JWT del archivo de ejemplo sólo se deben usar en desarrollo local.
+* **20 de 20 pruebas aprobadas (100% de éxito).**
+* **Patrón de diseño:** Arrange-Act-Assert (AAA) riguroso.
+* **Aislamiento:** Instancias dedicadas de `Microsoft.EntityFrameworkCore.InMemory` con identificadores únicos por prueba y simulación de dependencias con `Moq`.
 
-## Evidencias
+| Archivo de Prueba | Componente Evaluado | Escenarios Cubiertos |
+| :--- | :--- | :--- |
+| `ClientesControllerTests.cs` | Controlador de Clientes | Respuestas HTTP `200`, `404`, `201` y conflicto por email `409` |
+| `OrdenesControllerTests.cs` | Controlador de Órdenes | Creación válida, rechazo ante cliente inexistente y filtrado 1 a N |
+| `AuthTests.cs` | Servicio de Identidad | Registro con rol `User`, rechazo de duplicados y JWT con claims |
+| `AuthorizationTests.cs` | Middleware de Seguridad | Verificación estricta de atributos `[Authorize]` y roles `Admin` |
+| `ServiceTests.cs` | Reglas del Dominio | Validación de negocio y prohibición de borrado en cascada |
 
-Guarda las capturas de la demostración en `docs/evidencias/` con estos nombres:
+---
 
-|Archivo|Contenido sugerido|
-|---|---|
-|`01_postman_register_login.png`|Registro e inicio de sesión; token obtenido|
-|`02_postman_clientes_crud.png`|Operaciones CRUD de clientes con token|
-|`03_postman_403_user.png`|Usuario `User` recibe `403` al consultar un reporte|
-|`04_postman_200_admin.png`|Usuario `Admin` obtiene `200` del endpoint de reporte|
-|`05_dotnet_test.png`|Salida de pruebas aprobadas|
-|`06_reporte_clientes_activos.png`|Informe de clientes activos en SSRS|
-|`07_reporte_ingresos_clientes.png`|Informe de ingresos por cliente en SSRS|
-|`08_reporte_clientes_inactivos.png`|Informe de clientes inactivos en SSRS|
-|`09_redis_keys_ttl.png`|Claves Redis y expiración con `redis-cli`|
+## Estructura del Proyecto
 
-Los PDF de ejemplo renderizados están guardados en esta carpeta.
+```text
+DesafioEmpresarial.sln
+├── src/
+│   └── CompanyManagement.Api/
+│       ├── Controllers/            # Controladores REST (Auth, Clientes, Ordenes, Reportes)
+│       ├── Data/                   # AppDbContext, configuración de entidades y Seed
+│       ├── DTOs/                   # Data Transfer Objects y validaciones DataAnnotations
+│       ├── Models/                 # Entidades del dominio (Cliente, Orden)
+│       ├── Repositories/           # Interfaces e implementaciones del patrón Repository
+│       ├── Services/               # Lógica de negocio, servicios de autenticación y Redis
+│       └── appsettings.json        # Cadenas de conexión (SQL Server, Redis, SSRS, JWT)
+├── tests/
+│   └── CompanyManagement.Tests/    # Suite de pruebas unitarias xUnit
+├── database/                       # Scripts DDL/DML, esquema SQL y permisos de SSRS
+├── reports/                        # Definiciones RDL 2016 y script de despliegue automatizado
+├── postman/                        # Colección completa v2.1 (14 endpoints) y variables de entorno
+└── docs/                           # Enunciado oficial y evidencias técnicas
+```
 
-## Video demo
+---
 
-Enlace al video: `<PEGAR_AQUI_EL_ENLACE>`
+## Postman y Pruebas Manuales
 
-Guion sugerido para una demostración de 5 a 8 minutos:
+En la carpeta [postman/](file:///c:/Users/Kenn/Documents/TAREAS%20OFICIALES-%20universidad/DESARROLLO%20DE%20SOFTWARE%20EMPRESARIAL/Desafio%203/postman) se incluyen los archivos listos para importar:
+* **Colección:** `postman/Desafio3.postman_collection.json` (incluye los 14 endpoints estructurados por módulo y scripts automáticos de captura de token).
+* **Entorno:** `postman/Desafio3.local.postman_environment.json`.
 
-1. **0:00–0:45:** presentar la estructura del repositorio y tecnologías principales.
-2. **0:45–1:45:** registrar/iniciar sesión, mostrar JWT y explicar los roles `User` y `Admin`.
-3. **1:45–2:45:** demostrar CRUD de clientes y creación/consulta de órdenes.
-4. **2:45–3:45:** repetir un GET para observar cache hit; mostrar claves y TTL en Redis y luego invalidación tras una escritura.
-5. **3:45–4:45:** mostrar el `403` de `User`, el `200` de `Admin` y abrir los tres informes SSRS.
-6. **4:45–5:45:** ejecutar `dotnet test` y comentar la cobertura por archivo.
-7. **5:45–6:15:** cerrar con configuración, decisiones de persistencia y README.
+---
 
-## Preguntas probables en la defensa
+## Licencia y Uso Académico
 
-1. **¿Cómo se autentica una petición?** Se envía un JWT firmado en `Authorization: Bearer`; JwtBearer valida emisor, audiencia, firma y vigencia.
-2. **¿Cuál es el esquema de autenticación por defecto?** `Program.cs` establece `JwtBearerDefaults.AuthenticationScheme` como esquema de autenticación, desafío y prohibición.
-3. **¿Qué rol recibe un usuario nuevo?** `AuthService.Register` crea el usuario y llama a `AddToRoleAsync` con `User`.
-4. **¿Para qué se usa Repository?** `IClienteRepository` e `IOrdenRepository` aíslan las consultas de EF Core de los servicios.
-5. **¿Cómo se invalida la caché?** Los servicios eliminan las claves afectadas al crear/actualizar/eliminar clientes y al crear órdenes.
-6. **¿Qué ocurre si Redis cae?** `RedisCacheService` registra una advertencia y sus operaciones de caché fallan de forma controlada; la consulta continúa hacia SQL Server.
-7. **¿Por qué `DeleteBehavior.Restrict`?** Evita borrar órdenes históricas indirectamente; el servicio rechaza eliminar clientes que todavía tienen órdenes.
-8. **¿Quién puede ver los reportes?** `ReportesController` está decorado con `[Authorize(Roles = "Admin")]`; un usuario autenticado sin ese rol recibe `403`.
-9. **¿Cómo se aíslan las pruebas de base de datos?** Cada prueba de persistencia crea un nombre único para EF Core InMemory.
-10. **¿Qué configuración de datos usan los RDL?** Cada informe referencia el origen compartido `/DataSources/CompanyManagementDS`, que apunta a `CompanyManagement`.
-
-## Licencia
-
-Proyecto académico. No se especificó una licencia de distribución.
+Proyecto desarrollado con fines académicos para la asignatura de **Desarrollo de Software Empresarial** de la **Universidad Don Bosco (UDB)**. Todos los derechos reservados.

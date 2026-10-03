@@ -1,1 +1,317 @@
-{"info":{"name":"Desafío 3 CompanyManagement","schema":"https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},"variable":[{"key":"baseUrl","value":"http://localhost:5000"},{"key":"token","value":""}],"item":[{"name":"Register","request":{"method":"POST","header":[{"key":"Content-Type","value":"application/json"}],"url":"{{baseUrl}}/api/auth/register","body":{"mode":"raw","raw":"{\"email\":\"user@company.com\",\"password\":\"User123!\"}"}}},{"name":"Login admin","request":{"method":"POST","header":[{"key":"Content-Type","value":"application/json"}],"url":"{{baseUrl}}/api/auth/login","body":{"mode":"raw","raw":"{\"email\":\"admin@company.com\",\"password\":\"Admin123!\"}"}}},{"name":"Clientes","request":{"method":"GET","header":[{"key":"Authorization","value":"Bearer {{token}}"}],"url":"{{baseUrl}}/api/clientes"}},{"name":"Reportes activos","request":{"method":"GET","header":[{"key":"Authorization","value":"Bearer {{token}}"}],"url":"{{baseUrl}}/api/reportes/clientes-activos"}}]}
+{
+	"info": {
+		"name": "Desafío 3 CompanyManagement",
+		"description": "Colección completa para el Desafío 3 (opción 2) - Sistema de Gestión Empresarial con .NET 8, EF Core, Redis y SSRS.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:5000"
+		},
+		{
+			"key": "token",
+			"value": ""
+		}
+	],
+	"item": [
+		{
+			"name": "1. Autenticación",
+			"item": [
+				{
+					"name": "POST Registro de usuario (Rol User)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"usuario.demo@company.com\",\n  \"password\": \"User123!\"\n}"
+						},
+						"url": "{{baseUrl}}/api/auth/register",
+						"description": "Registra un nuevo usuario con rol predeterminado User."
+					}
+				},
+				{
+					"name": "POST Login Admin (Guarda Token automáticamente)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var data = pm.response.json();",
+									"    pm.environment.set(\"token\", data.token);",
+									"    pm.collectionVariables.set(\"token\", data.token);",
+									"    console.log(\"Token de Admin guardado con éxito.\");",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"admin@company.com\",\n  \"password\": \"Admin123!\"\n}"
+						},
+						"url": "{{baseUrl}}/api/auth/login",
+						"description": "Inicia sesión con la cuenta de administrador predeterminada y almacena el token JWT automáticamente en las variables de entorno."
+					}
+				},
+				{
+					"name": "POST Login Usuario (Guarda Token automáticamente)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var data = pm.response.json();",
+									"    pm.environment.set(\"token\", data.token);",
+									"    pm.collectionVariables.set(\"token\", data.token);",
+									"    console.log(\"Token de Usuario guardado con éxito.\");",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"usuario.demo@company.com\",\n  \"password\": \"User123!\"\n}"
+						},
+						"url": "{{baseUrl}}/api/auth/login",
+						"description": "Inicia sesión con la cuenta de usuario estándar y guarda el token."
+					}
+				}
+			]
+		},
+		{
+			"name": "2. Clientes (Protegidos)",
+			"item": [
+				{
+					"name": "GET Listar Clientes (Con Caché Redis)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": "{{baseUrl}}/api/clientes",
+						"description": "Devuelve la lista de clientes. Se cachea en Redis (clave clientes:all)."
+					}
+				},
+				{
+					"name": "GET Cliente por ID (Con Caché Redis)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": "{{baseUrl}}/api/clientes/1",
+						"description": "Devuelve el cliente con ID 1. Se cachea en Redis (clave clientes:1)."
+					}
+				},
+				{
+					"name": "POST Crear Cliente (Invalida Caché)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"nombre\": \"Nuevo Cliente Postman\",\n  \"email\": \"nuevo.postman@empresa.com\"\n}"
+						},
+						"url": "{{baseUrl}}/api/clientes",
+						"description": "Crea un nuevo cliente e invalida la caché clientes:all en Redis."
+					}
+				},
+				{
+					"name": "PUT Actualizar Cliente (Invalida Caché)",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"nombre\": \"Cliente Actualizado Postman\",\n  \"email\": \"actualizado.postman@empresa.com\"\n}"
+						},
+						"url": "{{baseUrl}}/api/clientes/1",
+						"description": "Actualiza el cliente con ID 1 e invalida su caché y la lista general."
+					}
+				},
+				{
+					"name": "DELETE Eliminar Cliente (Rol Admin)",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": "{{baseUrl}}/api/clientes/15",
+						"description": "Elimina un cliente que no posea órdenes asociadas (ej. ID 15). Requiere rol Admin."
+					}
+				}
+			]
+		},
+		{
+			"name": "3. Órdenes (Protegidos)",
+			"item": [
+				{
+					"name": "GET Listar Órdenes (Con Caché Redis)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": "{{baseUrl}}/api/ordenes",
+						"description": "Lista todas las órdenes registradas. Se cachea en Redis (clave ordenes:all)."
+					}
+				},
+				{
+					"name": "GET Orden por ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": "{{baseUrl}}/api/ordenes/1",
+						"description": "Obtiene la orden específica con ID 1."
+					}
+				},
+				{
+					"name": "GET Órdenes por Cliente",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": "{{baseUrl}}/api/ordenes/cliente/1",
+						"description": "Lista las órdenes pertenecientes al cliente con ID 1."
+					}
+				},
+				{
+					"name": "POST Crear Orden (Invalida Caché)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"clienteId\": 1,\n  \"fechaOrden\": \"2026-10-02T20:00:00Z\",\n  \"montoTotal\": 199.99\n}"
+						},
+						"url": "{{baseUrl}}/api/ordenes",
+						"description": "Crea una nueva orden para un cliente existente e invalida la caché de órdenes y cliente."
+					}
+				}
+			]
+		},
+		{
+			"name": "4. Reportes SSRS (Rol Admin)",
+			"item": [
+				{
+					"name": "GET Reporte 1: Clientes Activos",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": "{{baseUrl}}/api/reportes/clientes-activos",
+						"description": "Devuelve la URL del reporte SSRS de Clientes Activos (al menos 1 orden). Requiere rol Admin."
+					}
+				},
+				{
+					"name": "GET Reporte 2: Ingresos por Cliente",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": "{{baseUrl}}/api/reportes/ingresos-clientes",
+						"description": "Devuelve la URL del reporte SSRS de Ingresos por Cliente (suma de órdenes). Requiere rol Admin."
+					}
+				},
+				{
+					"name": "GET Reporte 3: Clientes Inactivos",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": "{{baseUrl}}/api/reportes/clientes-inactivos",
+						"description": "Devuelve la URL del reporte SSRS de Clientes Inactivos (registrados en el último mes sin órdenes). Requiere rol Admin."
+					}
+				}
+			]
+		}
+	]
+}
