@@ -5,3 +5,9 @@ obj/
 *.suo
 appsettings.Development.json
 TestResults/
+
+# Documentos Word (excluidos del repositorio)
+*.docx
+*.doc
+~$*.docx
+~$*.doc
